@@ -252,7 +252,8 @@ export function parseServerInfo(serverInfo) {
 }
 
 export function parseUrlParams(url) {
-	const [, rest] = url.split('://');
+	const schemeEnd = url.indexOf('://');
+	const rest = url.slice(schemeEnd + 3);
 	const [addressPart, ...remainingParts] = rest.split('?');
 	const paramsPart = remainingParts.join('?');
 
