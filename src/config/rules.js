@@ -52,46 +52,6 @@ export const UNIFIED_RULES = [
 		ip_rules: []
 	},
 	{
-		name: 'Microsoft',
-		site_rules: ['microsoft'],
-		ip_rules: []
-	},
-	{
-		name: 'Apple',
-		site_rules: ['apple'],
-		ip_rules: []
-	},
-	{
-		name: 'Social Media',
-		site_rules: ['facebook', 'instagram', 'twitter', 'tiktok', 'linkedin'],
-		ip_rules: []
-	},
-	{
-		name: 'Streaming',
-		site_rules: ['netflix', 'hulu', 'disney', 'hbo', 'amazon', 'bahamut'],
-		ip_rules: []
-	},
-	{
-		name: 'Gaming',
-		site_rules: ['steam', 'epicgames', 'ea', 'ubisoft', 'blizzard'],
-		ip_rules: []
-	},
-	{
-		name: 'Education',
-		site_rules: ['coursera', 'edx', 'udemy', 'khanacademy', 'category-scholar-!cn'],
-		ip_rules: []
-	},
-	{
-		name: 'Financial',
-		site_rules: ['paypal', 'visa', 'mastercard', 'stripe', 'wise'],
-		ip_rules: []
-	},
-	{
-		name: 'Cloud Services',
-		site_rules: ['aws', 'azure', 'digitalocean', 'heroku', 'dropbox'],
-		ip_rules: []
-	},
-	{
 		name: 'Non-China',
 		site_rules: ['geolocation-!cn'],
 		ip_rules: []
@@ -103,7 +63,7 @@ export const DIRECT_DEFAULT_RULES = new Set(['Private', 'Location:CN']);
 
 export const PREDEFINED_RULE_SETS = {
 	minimal: ['Location:CN', 'Private', 'Non-China'],
-	balanced: ['Location:CN', 'Private', 'Non-China', 'Github', 'Google', 'Youtube', 'AI Services', 'Telegram'],
+	balanced: ['Location:CN', 'Private', 'Non-China', 'Google', 'Telegram', 'AI Services'],
 	comprehensive: UNIFIED_RULES.map(rule => rule.name)
 };
 

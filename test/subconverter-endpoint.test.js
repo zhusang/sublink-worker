@@ -34,7 +34,7 @@ describe('GET /subconverter', () => {
         const res = await app.request('http://localhost/subconverter');
         const text = await res.text();
 
-        // balanced preset includes Google, Youtube, AI Services, Telegram, etc.
+        // balanced preset includes Google, AI Services, Telegram, etc.
         PREDEFINED_RULE_SETS.balanced.forEach(ruleName => {
             // Each selected rule should produce at least one ruleset line
             // (either GEOSITE or GEOIP)
@@ -43,8 +43,8 @@ describe('GET /subconverter', () => {
 
         // Check for specific rules from balanced set
         expect(text).toContain('GEOSITE,google');
-        expect(text).toContain('GEOSITE,youtube');
         expect(text).toContain('GEOIP,telegram');
+        expect(text).toContain('GEOSITE,category-ai-!cn');
     });
 
     it('accepts minimal preset', async () => {
@@ -73,8 +73,7 @@ describe('GET /subconverter', () => {
         expect(text).toContain('GEOSITE,google');
         expect(text).toContain('GEOSITE,bilibili');
         expect(text).toContain('GEOSITE,youtube');
-        expect(text).toContain('GEOSITE,netflix');
-        expect(text).toContain('GEOSITE,steam');
+        expect(text).toContain('GEOSITE,github');
         expect(text).toContain('GEOIP,telegram');
     });
 
@@ -310,9 +309,9 @@ describe('GET /subconverter', () => {
             const res = await app.request('http://localhost/subconverter');
             expect(res.status).toBe(200);
             const text = await res.text();
-            // balanced preset includes Google and Youtube
+            // balanced preset includes Google and AI Services
             expect(text).toContain('GEOSITE,google');
-            expect(text).toContain('GEOSITE,youtube');
+            expect(text).toContain('GEOSITE,category-ai-!cn');
         });
     });
 });
