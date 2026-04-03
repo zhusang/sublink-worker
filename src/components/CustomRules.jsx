@@ -245,8 +245,48 @@ export const CustomRules = (props) => {
     {/* Hidden input to store the final JSON for form submission */ }
     <input type="hidden" name="customRules" x-bind:value="JSON.stringify(rules)" />
 
+    {/* Save Rules Button */ }
+    <div class="mt-4 flex justify-end" x-data="{ get parentForm() { return this.$root.__x_refs || {} } }">
+      <button
+        type="button"
+        x-on:click="$dispatch('save-rules')"
+        class="px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors duration-200 font-medium text-sm flex items-center gap-2"
+      >
+        <i class="fas fa-cloud-upload-alt"></i>
+        {t('saveRules')}
+      </button>
+    </div>
+
         <script dangerouslySetInnerHTML={{
             __html: `
+        // Clash/Surge rule text parser (inline for browser runtime)
+        function _parseClashStyleRules(text) {
+          if (!text || typeof text !== 'string') return null;
+          var map = {
+            'DOMAIN-SUFFIX': 'domain_suffix', 'DOMAIN-KEYWORD': 'domain_keyword',
+            'IP-CIDR': 'ip_cidr', 'IP-CIDR6': 'ip_cidr', 'SRC-IP-CIDR': 'src_ip_cidr',
+            'GEOSITE': 'site', 'GEOIP': 'ip'
+          };
+          var lines = text.split(/\\r?\\n/).map(function(l){return l.trim()}).filter(function(l){return l && !l.startsWith('#') && !l.startsWith(';')});
+          if (!lines.length) return null;
+          var grouped = {}, matched = 0;
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].replace(/^-\\s+/, '');
+            var parts = line.split(',').map(function(s){return s.trim()});
+            if (parts.length < 3) continue;
+            var field = map[parts[0].toUpperCase()];
+            if (!field) continue;
+            var value = parts[1], outbound = parts[2];
+            if (!value || !outbound) continue;
+            matched++;
+            if (!grouped[outbound]) grouped[outbound] = { name: outbound };
+            var rule = grouped[outbound];
+            rule[field] = rule[field] ? rule[field] + ',' + value : value;
+          }
+          if (!matched) return null;
+          return Object.values(grouped);
+        }
+
         function customRulesData() {
           return {
             mode: 'form',
@@ -254,7 +294,21 @@ export const CustomRules = (props) => {
             jsonContent: '[]',
             jsonError: null,
             jsonValid: false,
-            
+
+            _tryParseInput(value) {
+              // Try JSON first
+              try {
+                var parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) return { rules: parsed, error: null };
+                return { rules: null, error: '${t('mustBeArray')}' };
+              } catch (jsonErr) {
+                // Fallback: try Clash/Surge rule text
+                var clashRules = _parseClashStyleRules(value);
+                if (clashRules) return { rules: clashRules, error: null };
+                return { rules: null, error: jsonErr.message };
+              }
+            },
+
             init() {
               // Watch for changes in rules to update JSON content
               this.$watch('rules', (value) => {
@@ -266,18 +320,14 @@ export const CustomRules = (props) => {
               // Watch for changes in JSON content to update rules
               this.$watch('jsonContent', (value) => {
                 if (this.mode === 'json') {
-                  try {
-                    const parsed = JSON.parse(value);
-                    if (Array.isArray(parsed)) {
-                      this.rules = parsed;
-                      this.jsonError = null;
-                      this.jsonValid = true;
-                      setTimeout(() => this.jsonValid = false, 3000);
-                    } else {
-                      this.jsonError = '${t('mustBeArray')}';
-                    }
-                  } catch (e) {
-                    this.jsonError = e.message;
+                  var result = this._tryParseInput(value);
+                  if (result.rules) {
+                    this.rules = result.rules;
+                    this.jsonError = null;
+                    this.jsonValid = true;
+                    setTimeout(() => this.jsonValid = false, 3000);
+                  } else {
+                    this.jsonError = result.error;
                   }
                 }
               });
@@ -324,18 +374,14 @@ export const CustomRules = (props) => {
             },
             
             validateJson() {
-              try {
-                const parsed = JSON.parse(this.jsonContent);
-                if (Array.isArray(parsed)) {
-                  this.rules = parsed;
-                  this.jsonError = null;
-                  this.jsonValid = true;
-                  setTimeout(() => this.jsonValid = false, 3000);
-                } else {
-                  this.jsonError = '${t('mustBeArray')}';
-                }
-              } catch (e) {
-                this.jsonError = e.message;
+              var result = this._tryParseInput(this.jsonContent);
+              if (result.rules) {
+                this.rules = result.rules;
+                this.jsonError = null;
+                this.jsonValid = true;
+                setTimeout(() => this.jsonValid = false, 3000);
+              } else {
+                this.jsonError = result.error;
               }
             }
           }

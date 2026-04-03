@@ -10,7 +10,7 @@ import { SingboxConfigBuilder } from '../builders/SingboxConfigBuilder.js';
 import { ClashConfigBuilder } from '../builders/ClashConfigBuilder.js';
 import { SurgeConfigBuilder } from '../builders/SurgeConfigBuilder.js';
 import { createTranslator, resolveLanguage } from '../i18n/index.js';
-import { encodeBase64, tryDecodeSubscriptionLines } from '../utils.js';
+import { encodeBase64, tryDecodeSubscriptionLines, parseClashStyleRules, generateWebPath } from '../utils.js';
 import { APP_NAME, APP_SUBTITLE } from '../constants.js';
 import { ShortLinkService } from '../services/shortLinkService.js';
 import { ConfigStorageService } from '../services/configStorageService.js';
@@ -75,8 +75,16 @@ export function createApp(bindings = {}) {
                 return c.text('Missing config parameter', 400);
             }
 
-            const selectedRules = parseSelectedRules(c.req.query('selectedRules'));
-            const customRules = parseJsonArray(c.req.query('customRules'));
+            let selectedRules = parseSelectedRules(c.req.query('selectedRules'));
+            let customRules = parseJsonArray(c.req.query('customRules'));
+            const rulesId = c.req.query('rulesId');
+            if (rulesId) {
+                const saved = await resolveRulesFromId(rulesId, services.configStorage);
+                if (saved) {
+                    if (selectedRules.length === 0 && Array.isArray(saved.selectedRules)) selectedRules = saved.selectedRules;
+                    if (customRules.length === 0 && Array.isArray(saved.customRules)) customRules = saved.customRules;
+                }
+            }
             const ua = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
@@ -127,8 +135,16 @@ export function createApp(bindings = {}) {
                 return c.text('Missing config parameter', 400);
             }
 
-            const selectedRules = parseSelectedRules(c.req.query('selectedRules'));
-            const customRules = parseJsonArray(c.req.query('customRules'));
+            let selectedRules = parseSelectedRules(c.req.query('selectedRules'));
+            let customRules = parseJsonArray(c.req.query('customRules'));
+            const rulesId = c.req.query('rulesId');
+            if (rulesId) {
+                const saved = await resolveRulesFromId(rulesId, services.configStorage);
+                if (saved) {
+                    if (selectedRules.length === 0 && Array.isArray(saved.selectedRules)) selectedRules = saved.selectedRules;
+                    if (customRules.length === 0 && Array.isArray(saved.customRules)) customRules = saved.customRules;
+                }
+            }
             const ua = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
@@ -173,8 +189,16 @@ export function createApp(bindings = {}) {
                 return c.text('Missing config parameter', 400);
             }
 
-            const selectedRules = parseSelectedRules(c.req.query('selectedRules'));
-            const customRules = parseJsonArray(c.req.query('customRules'));
+            let selectedRules = parseSelectedRules(c.req.query('selectedRules'));
+            let customRules = parseJsonArray(c.req.query('customRules'));
+            const rulesId = c.req.query('rulesId');
+            if (rulesId) {
+                const saved = await resolveRulesFromId(rulesId, services.configStorage);
+                if (saved) {
+                    if (selectedRules.length === 0 && Array.isArray(saved.selectedRules)) selectedRules = saved.selectedRules;
+                    if (customRules.length === 0 && Array.isArray(saved.customRules)) customRules = saved.customRules;
+                }
+            }
             const ua = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
@@ -207,7 +231,7 @@ export function createApp(bindings = {}) {
         }
     });
 
-    app.get('/subconverter', (c) => {
+    app.get('/subconverter', async (c) => {
         try {
             const rawSelectedRules = c.req.query('selectedRules');
             let selectedRules;
@@ -231,7 +255,15 @@ export function createApp(bindings = {}) {
 
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
-            const customRules = parseJsonArray(c.req.query('customRules'));
+            let customRules = parseJsonArray(c.req.query('customRules'));
+            const rulesId = c.req.query('rulesId');
+            if (rulesId) {
+                const saved = await resolveRulesFromId(rulesId, services.configStorage);
+                if (saved) {
+                    if (!rawSelectedRules && Array.isArray(saved.selectedRules)) selectedRules = saved.selectedRules;
+                    if (customRules.length === 0 && Array.isArray(saved.customRules)) customRules = saved.customRules;
+                }
+            }
             const lang = c.get('lang');
 
             const config = generateSubconverterConfig({
@@ -345,6 +377,27 @@ export function createApp(bindings = {}) {
         }
     });
 
+    app.post('/rules', async (c) => {
+        try {
+            const { selectedRules, customRules } = await c.req.json();
+            if (!Array.isArray(selectedRules) && !Array.isArray(customRules)) {
+                return c.text('Must provide selectedRules or customRules as arrays', 400);
+            }
+            const storage = requireConfigStorage(services.configStorage);
+            const rulesId = `rules_${generateWebPath(8)}`;
+            const payload = JSON.stringify({ selectedRules: selectedRules || [], customRules: customRules || [] });
+            const ttl = storage.options.configTtlSeconds;
+            const putOptions = ttl ? { expirationTtl: ttl } : undefined;
+            await storage.ensureKv().put(rulesId, payload, putOptions);
+            return c.text(rulesId);
+        } catch (error) {
+            if (error instanceof SyntaxError) {
+                return c.text(`Invalid format: ${error.message}`, 400);
+            }
+            return handleError(c, error, runtime.logger);
+        }
+    });
+
     app.get('/resolve', async (c) => {
         try {
             const shortUrl = c.req.query('url');
@@ -417,6 +470,9 @@ function parseJsonArray(raw) {
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
     } catch {
+        // Fallback: try parsing as Clash/Surge style rule text
+        const clashRules = parseClashStyleRules(raw);
+        if (clashRules) return clashRules;
         return [];
     }
 }
@@ -532,4 +588,17 @@ function handleError(c, error, logger) {
     }
     logger.error?.('Unhandled error', error);
     return c.text(`Error: ${error.message}`, 500);
+}
+
+async function resolveRulesFromId(rulesId, configStorage) {
+    if (!rulesId) return null;
+    const storage = requireConfigStorage(configStorage);
+    const kv = storage.ensureKv();
+    const stored = await kv.get(rulesId);
+    if (!stored) return null;
+    try {
+        return JSON.parse(stored);
+    } catch {
+        return null;
+    }
 }

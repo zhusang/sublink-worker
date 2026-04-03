@@ -34,7 +34,12 @@ export const Form = (props) => {
     customShortCode: t('customShortCode'),
     optional: t('optional'),
     customShortCodePlaceholder: t('customShortCodePlaceholder'),
-    showFullLinks: t('showFullLinks')
+    showFullLinks: t('showFullLinks'),
+    saveRules: t('saveRules'),
+    savingRules: t('savingRules'),
+    saveRulesSuccess: t('saveRulesSuccess'),
+    saveRulesFailed: t('saveRulesFailed'),
+    saveRulesEmpty: t('saveRulesEmpty')
   };
 
   const scriptContent = `
@@ -135,6 +140,7 @@ export const Form = (props) => {
         <option value="minimal">{t('minimal')}</option>
         <option value="balanced">{t('balanced')}</option>
         <option value="comprehensive">{t('comprehensive')}</option>
+        <option value="saved" x-show="currentRulesId" style="display:none;">{t('savedRules')}</option>
       </select>
           </div>
 

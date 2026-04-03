@@ -106,6 +106,8 @@ export const formLogicFn = (t) => {
             customShortCode: '',
             parsingUrl: false,
             parseDebounceTimer: null,
+            currentRulesId: '',
+            savingRules: false,
             // These will be populated from window.APP_TRANSLATIONS
             processingText: '',
             convertText: '',
@@ -141,6 +143,7 @@ export const formLogicFn = (t) => {
                 this.customShortCode = localStorage.getItem('customShortCode') || '';
                 const initialUrlParams = new URLSearchParams(window.location.search);
                 this.currentConfigId = initialUrlParams.get('configId') || '';
+                this.currentRulesId = localStorage.getItem('currentRulesId') || initialUrlParams.get('rulesId') || '';
 
                 // Load accordion states
                 const savedAccordion = localStorage.getItem('accordionSections');
@@ -177,6 +180,9 @@ export const formLogicFn = (t) => {
                 });
                 this.$watch('customShortCode', val => localStorage.setItem('customShortCode', val));
                 this.$watch('accordionSections', val => localStorage.setItem('accordionSections', JSON.stringify(val)), { deep: true });
+
+                // Listen for save-rules event from CustomRules component
+                this.$el.addEventListener('save-rules', () => this.saveRules());
             },
 
             toggleAccordion(section) {
@@ -391,6 +397,10 @@ export const formLogicFn = (t) => {
                         params.append('configId', configId);
                     }
 
+                    if (this.currentRulesId) {
+                        params.append('rulesId', this.currentRulesId);
+                    }
+
                     const queryString = params.toString();
 
                     this.generatedLinks = {
@@ -579,6 +589,56 @@ export const formLogicFn = (t) => {
                 }
             },
 
+            async saveRules() {
+                const customRulesInput = document.querySelector('input[name="customRules"]');
+                const customRules = customRulesInput && customRulesInput.value ? JSON.parse(customRulesInput.value) : [];
+                const selectedRules = this.selectedRules || [];
+
+                if (selectedRules.length === 0 && customRules.length === 0) {
+                    alert(window.APP_TRANSLATIONS.saveRulesEmpty || 'Please select rules or add custom rules first');
+                    return;
+                }
+
+                this.savingRules = true;
+                try {
+                    const response = await fetch('/rules', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ selectedRules, customRules })
+                    });
+                    const responseText = await response.text();
+                    if (!response.ok) {
+                        throw new Error(responseText || response.statusText || 'Request failed');
+                    }
+                    const rulesId = responseText.trim();
+                    if (!rulesId) throw new Error('Missing rules ID');
+
+                    this.currentRulesId = rulesId;
+                    this.selectedPredefinedRule = 'saved';
+                    localStorage.setItem('currentRulesId', rulesId);
+                    this.updateRulesIdInUrl(rulesId);
+
+                    const successMessage = window.APP_TRANSLATIONS.saveRulesSuccess || 'Rules saved successfully!';
+                    alert(successMessage + '\\nID: ' + rulesId);
+                } catch (error) {
+                    console.error('Failed to save rules:', error);
+                    const errorPrefix = window.APP_TRANSLATIONS.saveRulesFailed || 'Failed to save rules';
+                    alert(errorPrefix + ': ' + (error?.message || 'Unknown error'));
+                } finally {
+                    this.savingRules = false;
+                }
+            },
+
+            updateRulesIdInUrl(rulesId) {
+                const url = new URL(window.location.href);
+                if (rulesId) {
+                    url.searchParams.set('rulesId', rulesId);
+                } else {
+                    url.searchParams.delete('rulesId');
+                }
+                window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+            },
+
             // Populate form fields from parsed URL
             populateFormFromUrl(url) {
                 const params = new URLSearchParams(url.search);
@@ -645,9 +705,17 @@ export const formLogicFn = (t) => {
                     this.updateConfigIdInUrl(configId);
                 }
 
+                const rulesId = params.get('rulesId');
+                if (rulesId) {
+                    this.currentRulesId = rulesId;
+                    this.selectedPredefinedRule = 'saved';
+                    localStorage.setItem('currentRulesId', rulesId);
+                    this.updateRulesIdInUrl(rulesId);
+                }
+
                 // Expand advanced options if any advanced settings are present
                 if (selectedRules || customRules || this.groupByCountry || this.enableClashUI ||
-                    externalController || externalUiDownloadUrl || ua || configId) {
+                    externalController || externalUiDownloadUrl || ua || configId || rulesId) {
                     this.showAdvanced = true;
                 }
             }

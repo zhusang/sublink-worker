@@ -363,6 +363,65 @@ export const COUNTRY_DATA = {
 	'AE': { name: 'United Arab Emirates', emoji: '🇦🇪', aliases: ['阿联酋', 'United Arab Emirates'] },
 };
 
+const CLASH_RULE_TYPE_MAP = {
+	'DOMAIN-SUFFIX': 'domain_suffix',
+	'DOMAIN-KEYWORD': 'domain_keyword',
+	'IP-CIDR': 'ip_cidr',
+	'IP-CIDR6': 'ip_cidr',
+	'SRC-IP-CIDR': 'src_ip_cidr',
+	'GEOSITE': 'site',
+	'GEOIP': 'ip',
+};
+
+/**
+ * Parse Clash/Surge style rule text into customRules format.
+ * Accepts lines like:
+ *   DOMAIN-KEYWORD,talk-cloud,DIRECT
+ *   - DOMAIN-SUFFIX,example.com,Proxy
+ *   IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+ * Same-outbound rules are merged into one object.
+ * @param {string} text
+ * @returns {Array|null} parsed rules array, or null if input doesn't look like Clash rules
+ */
+export function parseClashStyleRules(text) {
+	if (!text || typeof text !== 'string') return null;
+
+	const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith(';'));
+	if (lines.length === 0) return null;
+
+	const grouped = {};
+	let matched = 0;
+
+	for (const rawLine of lines) {
+		// Strip leading "- " (YAML list prefix)
+		const line = rawLine.replace(/^-\s+/, '');
+		const parts = line.split(',').map(s => s.trim());
+		if (parts.length < 3) continue;
+
+		const ruleType = parts[0].toUpperCase();
+		const field = CLASH_RULE_TYPE_MAP[ruleType];
+		if (!field) continue;
+
+		const value = parts[1];
+		const outbound = parts[2];
+		if (!value || !outbound) continue;
+
+		matched++;
+		if (!grouped[outbound]) {
+			grouped[outbound] = { name: outbound };
+		}
+		const rule = grouped[outbound];
+		if (rule[field]) {
+			rule[field] = rule[field] + ',' + value;
+		} else {
+			rule[field] = value;
+		}
+	}
+
+	if (matched === 0) return null;
+	return Object.values(grouped);
+}
+
 export function parseCountryFromNodeName(nodeName) {
 	// Build patterns sorted by length descending so longer aliases match first
 	// (e.g. "Indonesia" before "India", "United States" before "US").
