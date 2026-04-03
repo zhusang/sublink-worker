@@ -245,18 +245,6 @@ export const CustomRules = (props) => {
     {/* Hidden input to store the final JSON for form submission */ }
     <input type="hidden" name="customRules" x-bind:value="JSON.stringify(rules)" />
 
-    {/* Save Rules Button */ }
-    <div class="mt-4 flex justify-end" x-data="{ get parentForm() { return this.$root.__x_refs || {} } }">
-      <button
-        type="button"
-        x-on:click="$dispatch('save-rules')"
-        class="px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors duration-200 font-medium text-sm flex items-center gap-2"
-      >
-        <i class="fas fa-cloud-upload-alt"></i>
-        {t('saveRules')}
-      </button>
-    </div>
-
         <script dangerouslySetInnerHTML={{
             __html: `
         // Clash/Surge rule text parser (inline for browser runtime)
@@ -310,11 +298,25 @@ export const CustomRules = (props) => {
             },
 
             init() {
-              // Watch for changes in rules to update JSON content
+              // Restore saved custom rules from localStorage
+              const saved = localStorage.getItem('customRules');
+              if (saved) {
+                try {
+                  const parsed = JSON.parse(saved);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    this.rules = parsed;
+                    this.jsonContent = JSON.stringify(parsed, null, 2);
+                  }
+                } catch (e) { }
+              }
+
+              // Watch for changes in rules to update JSON content and persist
               this.$watch('rules', (value) => {
                 if (this.mode === 'form') {
                   this.jsonContent = JSON.stringify(value, null, 2);
                 }
+                // Auto-save to localStorage
+                localStorage.setItem('customRules', JSON.stringify(value));
               });
 
               // Watch for changes in JSON content to update rules
@@ -370,6 +372,7 @@ export const CustomRules = (props) => {
               setTimeout(() => {
                 this.rules = [];
                 this.jsonContent = '[]';
+                localStorage.removeItem('customRules');
               }, 200);
             },
             
