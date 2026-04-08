@@ -73,10 +73,16 @@ export async function fetchSubscription(url, userAgent) {
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
+        const subscriptionUserinfo = response.headers.get('subscription-userinfo') || null;
         const text = await response.text();
         const decodedText = decodeContent(text);
 
-        return parseSubscriptionContent(decodedText);
+        const result = parseSubscriptionContent(decodedText);
+        // Attach userinfo to result if it's an object (config types)
+        if (result && typeof result === 'object' && !Array.isArray(result) && subscriptionUserinfo) {
+            result.subscriptionUserinfo = subscriptionUserinfo;
+        }
+        return result;
     } catch (error) {
         console.error('Error fetching or parsing HTTP(S) content:', error);
         return null;
@@ -102,11 +108,12 @@ export async function fetchSubscriptionWithFormat(url, userAgent) {
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
+        const subscriptionUserinfo = response.headers.get('subscription-userinfo') || null;
         const text = await response.text();
         const content = decodeContent(text);
         const format = detectFormat(content);
 
-        return { content, format, url };
+        return { content, format, url, subscriptionUserinfo };
     } catch (error) {
         console.error('Error fetching subscription:', error);
         return null;

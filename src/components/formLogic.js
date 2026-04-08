@@ -99,6 +99,7 @@ export const formLogicFn = (t) => {
             configValidationState: '',
             configValidationMessage: '',
             customUA: '',
+            customSubInfo: '',
             loading: false,
             generatedLinks: null,
             shortenedLinks: null,
@@ -136,6 +137,7 @@ export const formLogicFn = (t) => {
                 this.externalController = localStorage.getItem('externalController') || '';
                 this.externalUiDownloadUrl = localStorage.getItem('externalUiDownloadUrl') || '';
                 this.customUA = localStorage.getItem('userAgent') || '';
+                this.customSubInfo = localStorage.getItem('customSubInfo') || '';
                 this.configEditor = localStorage.getItem('configEditor') || '';
                 this.configType = localStorage.getItem('configType') || 'singbox';
                 this.customShortCode = localStorage.getItem('customShortCode') || '';
@@ -167,6 +169,7 @@ export const formLogicFn = (t) => {
                 this.$watch('externalController', val => localStorage.setItem('externalController', val));
                 this.$watch('externalUiDownloadUrl', val => localStorage.setItem('externalUiDownloadUrl', val));
                 this.$watch('customUA', val => localStorage.setItem('userAgent', val));
+                this.$watch('customSubInfo', val => localStorage.setItem('customSubInfo', val));
                 this.$watch('configEditor', val => {
                     localStorage.setItem('configEditor', val);
                     this.resetConfigValidation();
@@ -383,6 +386,7 @@ export const formLogicFn = (t) => {
                     if (this.enableClashUI) params.append('enable_clash_ui', 'true');
                     if (this.externalController) params.append('external_controller', this.externalController);
                     if (this.externalUiDownloadUrl) params.append('external_ui_download_url', this.externalUiDownloadUrl);
+                    if (this.customSubInfo) params.append('sub_info', this.customSubInfo);
 
                     // Add configId if present in URL
                     const urlParams = new URLSearchParams(window.location.search);
@@ -637,6 +641,11 @@ export const formLogicFn = (t) => {
                 const ua = params.get('ua');
                 if (ua) {
                     this.customUA = ua;
+                }
+
+                const subInfo = params.get('sub_info');
+                if (subInfo) {
+                    this.customSubInfo = subInfo;
                 }
 
                 const configId = params.get('configId');

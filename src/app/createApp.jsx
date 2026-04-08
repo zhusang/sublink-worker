@@ -122,6 +122,8 @@ export function createApp(bindings = {}) {
                 includeAutoSelect
             );
             await builder.build();
+            const subInfo = resolveSubInfo(c.req.query('sub_info'), builder.subscriptionUserinfo);
+            setSubInfoHeader(c, subInfo);
             return c.json(builder.config);
         } catch (error) {
             return handleError(c, error, runtime.logger);
@@ -174,6 +176,8 @@ export function createApp(bindings = {}) {
                 includeAutoSelect
             );
             await builder.build();
+            const subInfo = resolveSubInfo(c.req.query('sub_info'), builder.subscriptionUserinfo);
+            setSubInfoHeader(c, subInfo);
             return c.text(builder.formatConfig(), 200, {
                 'Content-Type': 'text/yaml; charset=utf-8'
             });
@@ -224,7 +228,8 @@ export function createApp(bindings = {}) {
             builder.setSubscriptionUrl(c.req.url);
             await builder.build();
 
-            c.header('subscription-userinfo', 'upload=0; download=0; total=10737418240; expire=2546249531');
+            const subInfo = resolveSubInfo(c.req.query('sub_info'), builder.subscriptionUserinfo);
+            setSubInfoHeader(c, subInfo);
             return c.text(builder.formatConfig());
         } catch (error) {
             return handleError(c, error, runtime.logger);
@@ -292,6 +297,7 @@ export function createApp(bindings = {}) {
         const finalProxyList = [];
         const userAgent = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
         const headers = { 'User-Agent': userAgent };
+        let collectedUserinfo = null;
 
         for (const proxy of proxylist) {
             const trimmedProxy = proxy.trim();
@@ -300,6 +306,10 @@ export function createApp(bindings = {}) {
             if (trimmedProxy.startsWith('http://') || trimmedProxy.startsWith('https://')) {
                 try {
                     const response = await fetch(trimmedProxy, { method: 'GET', headers });
+                    const upstreamUserinfo = response.headers.get('subscription-userinfo');
+                    if (upstreamUserinfo && !collectedUserinfo) {
+                        collectedUserinfo = upstreamUserinfo;
+                    }
                     const text = await response.text();
                     let processed = tryDecodeSubscriptionLines(text, { decodeUriComponent: true });
                     if (!Array.isArray(processed)) processed = [processed];
@@ -319,6 +329,8 @@ export function createApp(bindings = {}) {
             return c.text('Missing config parameter', 400);
         }
 
+        const subInfo = resolveSubInfo(c.req.query('sub_info'), collectedUserinfo);
+        setSubInfoHeader(c, subInfo);
         return c.text(encodeBase64(finalString));
     });
 
@@ -588,6 +600,24 @@ function handleError(c, error, logger) {
     }
     logger.error?.('Unhandled error', error);
     return c.text(`Error: ${error.message}`, 500);
+}
+
+/**
+ * Resolve subscription-userinfo: sub_info param > builder value > null
+ */
+function resolveSubInfo(subInfoParam, builderUserinfo) {
+    if (subInfoParam) return subInfoParam;
+    if (builderUserinfo) return builderUserinfo;
+    return null;
+}
+
+/**
+ * Set subscription-userinfo header on response if value is present
+ */
+function setSubInfoHeader(c, value) {
+    if (value) {
+        c.header('subscription-userinfo', value);
+    }
 }
 
 async function resolveRulesFromId(rulesId, configStorage) {

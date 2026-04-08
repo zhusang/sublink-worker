@@ -15,6 +15,7 @@ export class BaseConfigBuilder {
         this.groupByCountry = groupByCountry;
         this.includeAutoSelect = includeAutoSelect;
         this.providerUrls = [];  // URLs to use as providers (auto-sync)
+        this.subscriptionUserinfo = null;  // Aggregated subscription-userinfo from upstream
     }
 
     async build() {
@@ -91,7 +92,12 @@ export class BaseConfigBuilder {
                     try {
                         const fetchResult = await fetchSubscriptionWithFormat(trimmedUrl, this.userAgent);
                         if (fetchResult) {
-                            const { content, format, url: originalUrl } = fetchResult;
+                            const { content, format, url: originalUrl, subscriptionUserinfo } = fetchResult;
+
+                            // Collect subscription userinfo from upstream
+                            if (subscriptionUserinfo) {
+                                this.mergeSubscriptionUserinfo(subscriptionUserinfo);
+                            }
 
                             // If format is compatible with target client, use as provider
                             if (this.isCompatibleProviderFormat(format)) {
@@ -136,6 +142,10 @@ export class BaseConfigBuilder {
 
                 // Non-HTTP URLs (protocol URIs like ss://, vmess://, etc.)
                 const result = await ProxyParser.parse(processedUrl, this.userAgent);
+                // Collect subscription userinfo if present (from fetchSubscription via protocol dispatch)
+                if (result && typeof result === 'object' && result.subscriptionUserinfo) {
+                    this.mergeSubscriptionUserinfo(result.subscriptionUserinfo);
+                }
                 // Handle yamlConfig, singboxConfig, and surgeConfig types (they have the same structure)
                 if (result && typeof result === 'object' && (result.type === 'yamlConfig' || result.type === 'singboxConfig' || result.type === 'surgeConfig')) {
                     if (result.config) {
@@ -352,6 +362,66 @@ export class BaseConfigBuilder {
 
     generateRules() {
         return generateRules(this.selectedRules, this.customRules);
+    }
+
+    /**
+     * Parse a subscription-userinfo string into numeric fields
+     * Format: "upload=N; download=N; total=N; expire=N"
+     */
+    static parseUserinfo(raw) {
+        if (!raw || typeof raw !== 'string') return null;
+        const result = {};
+        raw.split(';').forEach(part => {
+            const [key, val] = part.split('=').map(s => s.trim());
+            if (key && val !== undefined) {
+                const num = Number(val);
+                if (!Number.isNaN(num)) result[key] = num;
+            }
+        });
+        return Object.keys(result).length > 0 ? result : null;
+    }
+
+    /**
+     * Serialize userinfo fields back to header string
+     */
+    static formatUserinfo(fields) {
+        if (!fields) return null;
+        const parts = [];
+        for (const key of ['upload', 'download', 'total', 'expire']) {
+            if (fields[key] !== undefined) parts.push(`${key}=${fields[key]}`);
+        }
+        return parts.length > 0 ? parts.join('; ') : null;
+    }
+
+    /**
+     * Merge an upstream subscription-userinfo into the aggregated value
+     * upload/download/total: sum; expire: take earliest (min)
+     */
+    mergeSubscriptionUserinfo(raw) {
+        const incoming = BaseConfigBuilder.parseUserinfo(raw);
+        if (!incoming) return;
+
+        const existing = BaseConfigBuilder.parseUserinfo(this.subscriptionUserinfo);
+        if (!existing) {
+            this.subscriptionUserinfo = raw.trim();
+            return;
+        }
+
+        const merged = {};
+        for (const key of ['upload', 'download', 'total']) {
+            const a = existing[key] || 0;
+            const b = incoming[key] || 0;
+            if (a || b) merged[key] = a + b;
+        }
+        if (existing.expire !== undefined && incoming.expire !== undefined) {
+            merged.expire = Math.min(existing.expire, incoming.expire);
+        } else if (existing.expire !== undefined) {
+            merged.expire = existing.expire;
+        } else if (incoming.expire !== undefined) {
+            merged.expire = incoming.expire;
+        }
+
+        this.subscriptionUserinfo = BaseConfigBuilder.formatUserinfo(merged);
     }
 
     formatConfig() {
