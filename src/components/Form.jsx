@@ -318,19 +318,71 @@ export const Form = (props) => {
             />
           </div>
 
-  {/* Custom Subscription Info */ }
+  {/* Custom Subscription Info */}
   <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
               <i class="fas fa-chart-bar text-gray-400"></i>
               {t('customSubInfo')}
             </h3>
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{t('customSubInfoTooltip')}</p>
+            
+            <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex items-center justify-between group border border-gray-100 dark:border-gray-700">
+              <code class="text-sm text-primary-600 dark:text-primary-400 break-all select-all">{t('customSubInfoPlaceholder')}</code>
+              <button 
+                type="button"
+                x-data="{ copied: false }"
+                x-on:click="navigator.clipboard.writeText('upload=0; download=0; total=10737418240; expire=1735689600'); copied = true; setTimeout(() => copied = false, 2000)"
+                class="ml-2 px-3 py-1.5 text-xs font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                x-bind:class="copied ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' : 'text-gray-600 dark:text-gray-400'"
+              >
+                <i class="fas" x-bind:class="copied ? 'fa-check' : 'fa-copy'"></i>
+                <span x-text={`copied ? '${t('copied')}' : '${t('copyExample')}'`}></span>
+              </button>
+            </div>
+
             <input
               type="text"
               x-model="customSubInfo"
-              class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm"
+              class="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm mb-4"
               placeholder={t('customSubInfoPlaceholder')}
             />
+
+            <div x-data="{ 
+              inputValue: 10, 
+              inputUnit: 'GB',
+              get result() {
+                const v = parseFloat(this.inputValue) || 0;
+                if (this.inputUnit === 'GB') return Math.floor(v * 1073741824);
+                if (this.inputUnit === 'MB') return Math.floor(v * 1048576);
+                if (this.inputUnit === 'TB') return Math.floor(v * 1099511627776);
+                return v;
+              }
+            }" class="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <i class="fas fa-calculator text-gray-400"></i>
+                <span>{t('byteConverter')}</span>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-3">
+                <div class="flex items-center gap-2 flex-1">
+                  <input type="number" x-model="inputValue" class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                  <select x-model="inputUnit" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium focus:ring-2 focus:ring-primary-500 focus:border-transparent cursor-pointer">
+                    <option value="GB">GB</option>
+                    <option value="MB">MB</option>
+                    <option value="TB">TB</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2 text-gray-400 justify-center">
+                  <i class="fas fa-arrow-right hidden sm:block"></i>
+                  <i class="fas fa-arrow-down sm:hidden"></i>
+                </div>
+                <div class="flex items-center gap-2 flex-1">
+                  <input type="text" readonly x-bind:value="result" class="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-sm font-mono text-gray-700 dark:text-gray-300" />
+                  <button type="button" x-data="{ copied: false }" x-on:click="navigator.clipboard.writeText(result.toString()); copied = true; setTimeout(() => copied = false, 2000)" class="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors tooltip flex-shrink-0" title={t('copyBytes')} x-bind:class="copied ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' : 'text-gray-600 dark:text-gray-400'">
+                    <i class="fas" x-bind:class="copied ? 'fa-check' : 'fa-copy'"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
